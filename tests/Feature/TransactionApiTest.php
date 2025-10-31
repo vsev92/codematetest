@@ -153,4 +153,51 @@ class TransactionApiTest extends TestCase
             'amount' => 150,
         ]);
     }
+
+    public function testDepositValidationError()
+    {
+        $response = $this->postJson('/api/deposit', [
+            'user_id' => '', // пустой user_id
+            'amount' => -100, // отрицательная сумма
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure([
+                'errors' => ['user_id', 'amount'],
+            ]);
+    }
+
+    public function testDepositCreatesAccountIfNotExists()
+    {
+        $user = User::factory()->create();
+
+        $this->assertDatabaseMissing('accounts', ['user_id' => $user->id]);
+
+        $response = $this->postJson('/api/deposit', [
+            'user_id' => $user->id,
+            'amount' => 300,
+            'comment' => 'Пополнение первого баланса',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'meta' => ['message'],
+                'data' => [
+                    'account' => ['user_id', 'balance'],
+                    'amount_deposited',
+                    'comment',
+                ],
+            ])
+            ->assertJson([
+                'data' => [
+                    'amount_deposited' => 300,
+                    'comment' => 'Пополнение первого баланса',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('accounts', [
+            'user_id' => $user->id,
+            'amount' => 300,
+        ]);
+    }
 }

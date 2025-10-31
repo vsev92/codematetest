@@ -56,4 +56,23 @@ class AccountApiTest extends TestCase
                 'balance' => 350,
             ]);
     }
+
+
+    public function testDepositForNonExistentUser()
+    {
+        $response = $this->getJson('/api/deposit', [
+            'user_id' => 99999,
+            'amount' => 100,
+        ]);
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'message' => 'Пользователь с таким ID не найден',
+                'errors' => [
+                    'user_id' => [
+                        'Пользователь с таким ID не найден'
+                    ]
+                ]
+            ]);
+    }
 }

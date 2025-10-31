@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\User;
 use App\Exceptions\NegativeBalanceException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,8 +19,12 @@ class TransactionService
      * @param float
      * @return float         Новый баланс после пополнения
      */
-    public function depositTransaction(Account $account, float $amount, ?string $comment, string|null $transferId = null): ApiDataResponse
+    public function depositTransaction(User $user, float $amount, ?string $comment, string|null $transferId = null): ApiDataResponse
     {
+        $account = $user->account ? $user->account : Account::factory()->create([
+            'user_id' => $user->id,
+            'amount' => 0
+        ]);
         $result =  DB::transaction(fn() => $this->updateBalance($account->id, $amount, TransactionType::DEPOSIT, $comment, $transferId));
         $account->refresh();
         $message = 'пополнение счёта';
