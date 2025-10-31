@@ -21,10 +21,10 @@ class TransactionService
      * @param float
      * @return float         Новый баланс после пополнения
      */
-    public function depositTransaction(Account $account, float $amount, string|null $transferId = null): ApiResponse
+    public function depositTransaction(Account $account, float $amount, string $comment, string|null $transferId = null): ApiResponse
     {
         try {
-            $result =  DB::transaction(fn() => $this->updateBalance($account->id, $amount, TransactionType::DEPOSIT, $transferId));
+            $result =  DB::transaction(fn() => $this->updateBalance($account->id, $amount, TransactionType::DEPOSIT, $comment, $transferId));
             $account->refresh();
             $message = 'пополнение счёта';
             $data = [
@@ -43,10 +43,10 @@ class TransactionService
      * @param float
      * @return float         Новый баланс после списания
      */
-    public function withdrawTransaction(Account $account, float $amount, string|null $transferId = null): ApiResponse
+    public function withdrawTransaction(Account $account, float $amount, string $comment, string|null $transferId = null): ApiResponse
     {
         try {
-            $result = DB::transaction(fn() => $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $transferId));
+            $result = DB::transaction(fn() => $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId));
             $account->refresh();
             $message = 'списание со счёта';
             $data = [
@@ -66,13 +66,13 @@ class TransactionService
      * @param float
      * @return array        Новый баланс после трансфера
      */
-    public function transferTransaction(Account $account, Account $recipientsAccount, float $amount): ApiResponse
+    public function transferTransaction(Account $account, Account $recipientsAccount, float $amount, string $comment): ApiResponse
     {
         try {
-            $data =  DB::transaction(function () use ($account, $amount, $recipientsAccount) {
+            $data =  DB::transaction(function () use ($account, $amount, $recipientsAccount, $comment) {
                 $transferId = (string) Str::uuid();
-                $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $transferId);
-                $this->updateBalance($recipientsAccount->id, $amount, TransactionType::DEPOSIT, $transferId);
+                $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId);
+                $this->updateBalance($recipientsAccount->id, $amount, TransactionType::DEPOSIT, $comment, $transferId);
                 $account->refresh();
                 $recipientsAccount->refresh();
                 return [
@@ -80,6 +80,7 @@ class TransactionService
                     'amount_transfered' => $amount,
                     'sender'   => $account,
                     'recipient' => $recipientsAccount,
+                    'comment' => $comment
                 ];
             });
             $message = 'перевод между счетами';
@@ -90,7 +91,7 @@ class TransactionService
     }
 
 
-    private function updateBalance(int $accountId, float $amount, string $transactionType, ?string $transferId): float
+    private function updateBalance(int $accountId, float $amount, string $transactionType, string $comment, ?string $transferId): float
     {
         $account = Account::where('id', $accountId)
             ->lockForUpdate()
@@ -107,7 +108,8 @@ class TransactionService
         $account->transactions()->create([
             'type_id' => $transactionType,
             'amount' => abs($amount),
-            'transfer_id' => $transferId
+            'transfer_id' => $transferId,
+            'comment' => $comment
         ]);
 
         return $account->amount;

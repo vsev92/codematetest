@@ -13,19 +13,19 @@ class TransactionController extends Controller
     public function deposit(BalanceUpdateRequest $request, TransactionService $service)
     {
         $user = User::findOrFail($request->user_id);
-        return $service->depositTransaction($user->account, $request->amount);
+        return $service->depositTransaction($user->account, $request->amount, $request->comment);
     }
 
     public function withdraw(BalanceUpdateRequest $request, TransactionService $service)
     {
         $user = User::findOrFail($request->user_id);
-        return $service->withdrawTransaction($user->account, $request->amount);
+        return $service->withdrawTransaction($user->account, $request->amount, $request->comment);
     }
 
     public function transfer(TransferRequest $request, TransactionService $service)
     {
         $userFrom = User::findOrFail($request->from_user_id);
         $userTo = User::findOrFail($request->to_user_id);
-        return $service->transferTransaction($userFrom->account, $userTo->account, $request->amount);
+        return $service->transferTransaction($userFrom->account, $userTo->account, $request->amount, $request->comment);
     }
 }
