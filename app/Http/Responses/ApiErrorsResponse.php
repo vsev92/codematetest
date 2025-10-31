@@ -1,17 +1,13 @@
 <?php
 
-namespace App\Http\Responses;
 
-use Throwable;
+namespace App\Http\Responses;
 
 class ApiErrorsResponse extends ApiResponse
 {
-    public function __construct(Throwable $exception, array $meta = [], int $defaultStatusCode = 500)
+    public function __construct(int $statusCode, array $errors,  array $meta = [])
     {
-        $statusCode = $exception->getCode() > 0 ? $exception->getCode() : $defaultStatusCode;
-
         parent::__construct($statusCode, $meta);
-
-        $this->response['errors'] = [$exception->getMessage()];
+        $this->response['errors'] = $errors;
     }
 }

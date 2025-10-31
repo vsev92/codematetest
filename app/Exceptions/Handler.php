@@ -2,17 +2,16 @@
 
 namespace App\Exceptions;
 
+use App\Http\Responses\ApiErrorsResponse;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\ValidationException;
-use Throwable;
+use Illuminate\Database\QueryException;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
-
     protected $dontReport = [];
-
 
     protected $dontFlash = [
         'current_password',
@@ -29,28 +28,30 @@ class Handler extends ExceptionHandler
     {
         if ($request->expectsJson()) {
 
+            if ($exception instanceof \Illuminate\Validation\ValidationException) {
+                return new ApiErrorsResponse(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->errors());
+            }
+
+
             if ($exception instanceof ModelNotFoundException) {
-                return response()->json([
-                    'status' => Response::HTTP_NOT_FOUND,
-                    'message' => 'Запрашиваемый ресурс не найден',
-                    'errors' => [
-                        'model' => class_basename($exception->getModel())
-                    ]
-                ], Response::HTTP_NOT_FOUND);
+                return new ApiErrorsResponse(Response::HTTP_NOT_FOUND, ['message' => 'Resource not found']);
             }
 
-            if ($exception instanceof ValidationException) {
-                return response()->json([
-                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                    'message' => 'Ошибка валидации данных',
-                    'errors' => $exception->errors(),
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+
+            if ($exception instanceof NegativeBalanceException) {
+                return new ApiErrorsResponse(Response::HTTP_CONFLICT, ['message' => $exception->getMessage()]);
             }
 
-            return response()->json([
-                'status' => $exception->getCode() ?: 500,
-                'message' => $exception->getMessage() ?: 'Внутренняя ошибка сервера',
-            ], $exception->getCode() ?: 500);
+
+            if ($exception instanceof QueryException) {
+                $code = $exception->getCode() === '23000'
+                    ? Response::HTTP_CONFLICT
+                    : Response::HTTP_INTERNAL_SERVER_ERROR;
+
+                return new ApiErrorsResponse($code, ['message' => $exception->getMessage()]);
+            }
+
+            return new ApiErrorsResponse(Response::HTTP_INTERNAL_SERVER_ERROR, ['message' => $exception->getMessage()]);
         }
 
         return parent::render($request, $exception);

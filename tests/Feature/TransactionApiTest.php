@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Account;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\TransactionType;
 
 class TransactionApiTest extends TestCase
 {
@@ -30,23 +31,42 @@ class TransactionApiTest extends TestCase
             'user_id' => $this->user2->id,
             'amount'  => 0,
         ]);
+
+        $types = [
+            TransactionType::DEPOSIT,
+            TransactionType::WITHDRAW,
+            TransactionType::TRANSFER,
+        ];
+
+        foreach ($types as $type) {
+            TransactionType::firstOrCreate(['name' => $type]);
+        }
     }
 
-    public function testDiposit()
+    public function testDeposit()
     {
+        $comment = 'Пополнение через карту';
+
         $response = $this->postJson('/api/deposit', [
             'user_id' => $this->user1->id,
             'amount' => 500,
-            'comment' => 'Пополнение через карту',
+            'comment' => $comment,
         ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'data' => [
-                    'account' => ['user_id', 'amount'],
-                    'amount_deposited',
-                ],
                 'meta' => ['message'],
+                'data' => [
+                    'account' => ['user_id', 'balance'],
+                    'amount_deposited',
+                    'comment',
+                ],
+            ])
+            ->assertJson([
+                'data' => [
+                    'amount_deposited' => 500,
+                    'comment' => $comment,
+                ],
             ]);
 
         $this->assertDatabaseHas('accounts', [
@@ -54,7 +74,6 @@ class TransactionApiTest extends TestCase
             'amount' => 500,
         ]);
     }
-
 
     public function testWithdraw()
     {
@@ -90,30 +109,38 @@ class TransactionApiTest extends TestCase
 
         $response->assertStatus(409)
             ->assertJsonFragment([
-                'message' => 'Недостаточно средств на счете',
+                'error' => 'Недостаточно средств для списания',
             ]);
     }
 
     public function testTransfer()
     {
+        $comment = 'Перевод другу';
         $this->user1->account->update(['amount' => 500]);
 
         $response = $this->postJson('/api/transfer', [
             'from_user_id' => $this->user1->id,
             'to_user_id' => $this->user2->id,
             'amount' => 150,
-            'comment' => 'Перевод другу',
+            'comment' => $comment,
         ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
+                'meta' => ['message'],
                 'data' => [
                     'transfer_id',
                     'amount_transfered',
-                    'sender' => ['user_id', 'amount',],
-                    'recipient' => ['user_id', 'amount'],
+                    'sender' => ['user_id', 'balance'],
+                    'recipient' => ['user_id', 'balance'],
+                    'comment',
                 ],
-                'meta' => ['message'],
+            ])
+            ->assertJson([
+                'data' => [
+                    'amount_transfered' => 150,
+                    'comment' => $comment,
+                ],
             ]);
 
         $this->assertDatabaseHas('accounts', [

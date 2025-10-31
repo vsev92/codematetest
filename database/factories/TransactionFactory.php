@@ -9,15 +9,15 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class TransactionFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Transaction::class;
+
     public function definition(): array
     {
         return [
-            //
+            'account_id' => Account::factory(),
+            'type_id' => TransactionType::factory(),
+            'amount' => $this->faker->randomFloat(2, 1, 500),
+            'transfer_id' => null,
         ];
     }
 }

@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Account;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\TransactionType;
 
 class AccountApiTest extends TestCase
 {
@@ -30,6 +31,16 @@ class AccountApiTest extends TestCase
             'user_id' => $this->user2->id,
             'amount'  => 0,
         ]);
+
+        $types = [
+            TransactionType::DEPOSIT,
+            TransactionType::WITHDRAW,
+            TransactionType::TRANSFER,
+        ];
+
+        foreach ($types as $type) {
+            TransactionType::firstOrCreate(['name' => $type]);
+        }
     }
 
 

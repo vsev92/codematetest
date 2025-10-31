@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class TransactionType extends Model
 {
+    use HasFactory;
 
     public const DEPOSIT  = 'deposit';
     public const WITHDRAW = 'withdraw';

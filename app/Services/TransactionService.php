@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\TransactionType;
 use App\Http\Responses\ApiDataResponse;
-use App\Http\Responses\ApiErrorsResponse;
-use App\Http\Responses\ApiResponse;
-use Throwable;
 
 class TransactionService
 {
@@ -21,20 +18,17 @@ class TransactionService
      * @param float
      * @return float         Новый баланс после пополнения
      */
-    public function depositTransaction(Account $account, float $amount, string $comment, string|null $transferId = null): ApiResponse
+    public function depositTransaction(Account $account, float $amount, ?string $comment, string|null $transferId = null): ApiDataResponse
     {
-        try {
-            $result =  DB::transaction(fn() => $this->updateBalance($account->id, $amount, TransactionType::DEPOSIT, $comment, $transferId));
-            $account->refresh();
-            $message = 'пополнение счёта';
-            $data = [
-                'account' => $account->toArray(),
-                'amount_deposited' => $amount,
-            ];
-            return new ApiDataResponse(200, $data, compact('message'));
-        } catch (Throwable $e) {
-            return new ApiErrorsResponse($e, ['message' => 'Ошибка транзакции']);
-        }
+        $result =  DB::transaction(fn() => $this->updateBalance($account->id, $amount, TransactionType::DEPOSIT, $comment, $transferId));
+        $account->refresh();
+        $message = 'пополнение счёта';
+        $data = [
+            'account' => $account->toArray(),
+            'amount_deposited' => $amount,
+            'comment' => $comment
+        ];
+        return new ApiDataResponse(200, $data, compact('message'));
     }
 
     /**
@@ -43,20 +37,19 @@ class TransactionService
      * @param float
      * @return float         Новый баланс после списания
      */
-    public function withdrawTransaction(Account $account, float $amount, string $comment, string|null $transferId = null): ApiResponse
+    public function withdrawTransaction(Account $account, float $amount, ?string $comment, string|null $transferId = null): ApiDataResponse
     {
-        try {
-            $result = DB::transaction(fn() => $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId));
-            $account->refresh();
-            $message = 'списание со счёта';
-            $data = [
-                'account' => $account->toArray(),
-                'amount_withdrawed' => $amount,
-            ];
-            return new ApiDataResponse(200, $data, compact('message'));
-        } catch (Throwable $e) {
-            return new ApiErrorsResponse($e, ['message' => 'Ошибка транзакции']);
-        }
+
+        $result = DB::transaction(fn() => $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId));
+        $account->refresh();
+        $message = 'списание со счёта';
+        $data = [
+            'account' => $account->toArray(),
+            'amount_withdrawed' => $amount,
+            'comment' => $comment
+
+        ];
+        return new ApiDataResponse(200, $data, compact('message'));
     }
 
 
@@ -66,36 +59,34 @@ class TransactionService
      * @param float
      * @return array        Новый баланс после трансфера
      */
-    public function transferTransaction(Account $account, Account $recipientsAccount, float $amount, string $comment): ApiResponse
+    public function transferTransaction(Account $account, Account $recipientsAccount, float $amount, ?string $comment): ApiDataResponse
     {
-        try {
-            $data =  DB::transaction(function () use ($account, $amount, $recipientsAccount, $comment) {
-                $transferId = (string) Str::uuid();
-                $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId);
-                $this->updateBalance($recipientsAccount->id, $amount, TransactionType::DEPOSIT, $comment, $transferId);
-                $account->refresh();
-                $recipientsAccount->refresh();
-                return [
-                    'transfer_id'      => $transferId,
-                    'amount_transfered' => $amount,
-                    'sender'   => $account,
-                    'recipient' => $recipientsAccount,
-                    'comment' => $comment
-                ];
-            });
-            $message = 'перевод между счетами';
-            return new ApiDataResponse(200, $data, compact('message'));
-        } catch (Throwable $e) {
-            return new ApiErrorsResponse($e, ['message' => 'Ошибка транзакции']);
-        }
+        $data =  DB::transaction(function () use ($account, $amount, $recipientsAccount, $comment) {
+            $transferId = (string) Str::uuid();
+            $this->updateBalance($account->id, -$amount, TransactionType::WITHDRAW, $comment, $transferId);
+            $this->updateBalance($recipientsAccount->id, $amount, TransactionType::DEPOSIT, $comment, $transferId);
+            $account->refresh();
+            $recipientsAccount->refresh();
+            return [
+                'transfer_id'      => $transferId,
+                'amount_transfered' => $amount,
+                'sender'   => $account,
+                'recipient' => $recipientsAccount,
+                'comment' => $comment
+            ];
+        });
+        $message = 'перевод между счетами';
+        return new ApiDataResponse(200, $data, compact('message'));
     }
 
 
-    private function updateBalance(int $accountId, float $amount, string $transactionType, string $comment, ?string $transferId): float
+    private function updateBalance(int $accountId, float $amount, string $transactionType, ?string $comment, ?string $transferId): float
     {
         $account = Account::where('id', $accountId)
             ->lockForUpdate()
             ->firstOrFail();
+
+        $transactionTypeId = TransactionType::getIdByName($transactionType);
 
         $newAmount = $account->amount + $amount;
         if ($newAmount < 0) {
@@ -106,7 +97,7 @@ class TransactionService
         $account->save();
 
         $account->transactions()->create([
-            'type_id' => $transactionType,
+            'type_id' => $transactionTypeId,
             'amount' => abs($amount),
             'transfer_id' => $transferId,
             'comment' => $comment
