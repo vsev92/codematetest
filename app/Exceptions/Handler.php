@@ -33,6 +33,9 @@ class Handler extends ExceptionHandler
                 return new ApiErrorsResponse(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->errors());
             }
 
+            if ($exception instanceof UserNotFoundException) {
+                return new ApiErrorsResponse(Response::HTTP_NOT_FOUND, ['message' => $exception->getMessage()]);
+            }
 
             if ($exception instanceof ModelNotFoundException) {
                 return new ApiErrorsResponse(Response::HTTP_NOT_FOUND, ['message' => 'Resource not found']);
