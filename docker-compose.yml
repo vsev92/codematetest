@@ -1,0 +1,53 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codematetest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/var/www
+    environment:
+      LOG_CHANNEL: database
+      LOG_DEPRECATIONS_CHANNEL: null
+      LOG_LEVEL: debug
+      APP_ENV: local
+      APP_DEBUG: true
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: codemate_db
+      DB_USERNAME: codemate_user
+      DB_PASSWORD: secret
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        php artisan migrate:fresh --force &&
+        php artisan db:seed &&
+        php artisan serve --host=0.0.0.0 --port=8000
+      "
+
+  db:
+    image: postgres:15
+    container_name: codemate_db
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: codemate_db
+      POSTGRES_USER: codemate_user
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codemate_user -d codemate_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  pgdata:
