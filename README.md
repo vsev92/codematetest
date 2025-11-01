@@ -1,7 +1,7 @@
 ## Download project
 ```bash
-git clone git@gitlab.com:kodeksInternship/internship.git
-cd  codemateTest
+git clone git@github.com:vsev92/codematetest.git
+cd  codematetest
 ```
 ## Install project
 ```bash
